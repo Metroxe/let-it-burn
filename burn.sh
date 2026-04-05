@@ -21,52 +21,59 @@ PROMPTS=(
   "Narrate a nature documentary script about the lifecycle of a cigarette, from tobacco seed to ashtray, in the voice of David Attenborough. Be lavishly detailed."
 )
 
-log() {
-  echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOGDIR/main.log"
-}
+COLORS=(31 32 33 34 35 36 91 92 93 94)
 
 worker() {
   local id=$1
   local logfile="$LOGDIR/worker-$id.log"
   local round=0
-
-  echo "[$(date '+%H:%M:%S')] Worker $id started" >> "$logfile"
+  local color="${COLORS[$(( (id - 1) % ${#COLORS[@]} ))]}"
+  local tag="\033[${color}m[worker $id]\033[0m"
 
   while true; do
     prompt="${PROMPTS[$(( (id + round) % ${#PROMPTS[@]} ))]}"
     round=$((round + 1))
 
-    echo "[$(date '+%H:%M:%S')] Round $round — ${prompt:0:60}..." >> "$logfile"
+    echo -e "\n$tag 🔥 Round $round — ${prompt:0:60}..."
 
-    output=$(claude --print --model claude-opus-4-6 --max-tokens 16000 "$prompt" 2>&1) || {
+    output=$(claude --print --model claude-opus-4-6 --tools "" --bare "$prompt" 2>&1) || {
       if echo "$output" | grep -qi "rate.limit\|overloaded\|529\|too many\|capacity"; then
-        echo "[$(date '+%H:%M:%S')] 🚬 Rate limited after $round rounds" >> "$logfile"
+        echo -e "$tag 🚬 Rate limited after $round rounds"
         return 0
       fi
-      echo "[$(date '+%H:%M:%S')] ⚠️  Error: ${output:0:200}" >> "$logfile"
+      echo -e "$tag ⚠️  Error: ${output:0:200}"
       sleep 5
       continue
     }
 
+    # Print response with colored prefix on each line
+    echo "$output" | while IFS= read -r line; do
+      echo -e "$tag $line"
+    done
+
     chars=$(echo "$output" | wc -c)
-    echo "[$(date '+%H:%M:%S')] ✓ Burned ~$((chars / 4)) tokens" >> "$logfile"
+    echo -e "$tag ✓ Burned ~$((chars / 4)) tokens"
+
+    # Full output to log
+    echo "[$(date '+%H:%M:%S')] Round $round — ~$((chars / 4)) tokens" >> "$logfile"
+    echo "$output" >> "$logfile"
   done
 }
 
-log "🔥 let-it-burn started — $WORKERS parallel workers"
-log "Logs: $LOGDIR/"
+echo "🔥 let-it-burn — $WORKERS parallel workers"
+echo ""
 
 pids=()
 for i in $(seq 1 $WORKERS); do
   worker "$i" &
   pids+=($!)
-  log "Launched worker $i (PID ${pids[-1]})"
 done
 
 # Wait for all workers, or kill them all on Ctrl+C
-trap 'log "🛑 Interrupted — killing workers"; kill "${pids[@]}" 2>/dev/null; wait; exit 1' INT TERM
+trap 'trap - INT TERM; echo ""; echo "🛑 Killed all workers"; kill -- -$$; wait; exit 1' INT TERM
 
 wait "${pids[@]}"
 
-log "🔥 let-it-burn complete. All $WORKERS workers finished."
-log "Logs: $LOGDIR/"
+echo ""
+echo "🔥 let-it-burn complete. All $WORKERS workers finished."
+echo "Logs: $LOGDIR/"
