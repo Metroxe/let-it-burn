@@ -1,6 +1,6 @@
 # let-it-burn 🚬
 
-![crab smoking](./cig.png)
+![crab smoking](./cig.jpg)
 
 Torch your remaining Claude tokens on cigarette discourse before your weekly reset.
 
