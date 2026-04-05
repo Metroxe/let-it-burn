@@ -1,5 +1,7 @@
 # let-it-burn 🚬
 
+![crab smoking](./cig.png)
+
 Torch your remaining Claude tokens on cigarette discourse before your weekly reset.
 
 10 parallel sessions. Runs until rate limited.
